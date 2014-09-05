@@ -35,7 +35,7 @@ The sequence name should follow this format ```{$table}.'_'.{$column}.'_seq'``` 
 
 ###Usage
 
-Using the userspace PDO driver is easy. Simply replace instantiate the alfmel\OCI8\PDO class instead of the PDO class in PHP. Then use
+Using the userspace PDO driver is easy. Simply instantiate the alfmel\OCI8\PDO class instead of the PDO class in PHP. Then use
 the PDO object as you would any other PDO object:
 
 ```php
