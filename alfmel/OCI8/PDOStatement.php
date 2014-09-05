@@ -8,10 +8,7 @@
  * @copyright Copyright (c) 2013 Mathieu Dumoulin (http://crazycoders.net/)
  * @license MIT
  */
-namespace yajra\Pdo\Oci8;
-
-use yajra\Pdo\Oci8;
-use yajra\Pdo\Oci8\Exceptions\SqlException;
+namespace alfmel\OCI8;
 
 /**
  * Oci8 Statement class to mimic the interface of the PDOStatement class
@@ -20,7 +17,7 @@ use yajra\Pdo\Oci8\Exceptions\SqlException;
  * this so that instanceof check and type-hinting of existing code will work
  * seamlessly.
  */
-class Statement
+class PDOStatement
     extends \PDOStatement
 {
 
@@ -34,7 +31,7 @@ class Statement
     /**
      * PDO Oci8 driver
      *
-     * @var \yajra\Pdo\Oci8
+     * @var PDO
      */
     protected $_pdoOci8;
 
@@ -105,12 +102,12 @@ class Statement
      * Constructor
      *
      * @param resource $sth Statement handle created with oci_parse()
-     * @param Oci8 $pdoOci8 The Pdo_Oci8 object for this statement
+     * @param PDO $pdoOci8 The Pdo_Oci8 object for this statement
      * @param array $options Options for the statement handle
      * @throws \PDOException
      */
     public function __construct($sth,
-                                Oci8 $pdoOci8,
+                                PDO $pdoOci8,
                                 array $options = array())
     {
 
@@ -130,7 +127,7 @@ class Statement
      *
      * @param array $inputParams An array of values with as many elements as
      *   there are bound parameters in the SQL statement being executed.
-     * @throws SqlException
+     * @throws \PDOException
      * @return bool TRUE on success or FALSE on failure
      */
     public function execute($inputParams = null)
@@ -158,7 +155,7 @@ class Statement
             $message = $message . 'Position      : ' . $e['offset'] . PHP_EOL;
             $message = $message . 'Statement     : ' . $e['sqltext'];
             
-            throw new SqlException($message, $e['code']);
+            throw new \PDOException($message, $e['code']);
         }
         return $result;
     }

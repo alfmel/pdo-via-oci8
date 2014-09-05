@@ -8,10 +8,7 @@
  * @copyright Copyright (c) 2013 Mathieu Dumoulin (http://crazycoders.net/)
  * @license MIT
  */
-namespace yajra\Pdo;
-
-use yajra\Pdo\Oci8\Exceptions\SqlException;
-use yajra\Pdo\Oci8\Statement;
+namespace alfmel\OCI8;
 
 /**
  * Oci8 class to mimic the interface of the PDO class
@@ -20,7 +17,7 @@ use yajra\Pdo\Oci8\Statement;
  * that instanceof checks and type-hinting of existing code will work
  * seamlessly.
  */
-class Oci8
+class PDO
     extends \PDO
 {
 
@@ -59,7 +56,7 @@ class Oci8
      * @param $username [optional]
      * @param $password [optional]
      * @param array $options [optional]
-     * @throws SqlException
+     * @throws \PDOException
      */
     public function __construct($dsn, $username, $password, array $options = array())
     {
@@ -80,7 +77,7 @@ class Oci8
         //Check if connection was successful
         if (!$this->_dbh) {
             $e = oci_error();
-            throw new SqlException($e['message']);
+            throw new \PDOException($e['message']);
         }
 
         //Save the options
@@ -95,8 +92,8 @@ class Oci8
      * @param array $options [optional] This array holds one or more key=>value
      *   pairs to set attribute values for the PDOStatement object that this
      *   method returns.
-     * @throws SqlException
-     * @return Statement
+     * @throws \PDOException
+     * @return PDOStatement
      */
     public function prepare($statement, $options = null)
     {
@@ -129,14 +126,14 @@ class Oci8
 
         if (!$sth) {
             $e = oci_error($this->_dbh);
-            throw new SqlException($e['message']);
+            throw new \PDOException($e['message']);
         }
 
         if (!is_array($options)) {
             $options = array();
         }
 
-        return new Statement($sth, $this, $options);
+        return new PDOStatement($sth, $this, $options);
     }
 
     /**
@@ -254,7 +251,7 @@ class Oci8
      *   PDO::FETCH_* constants.
      * @param mixed|null $modeArg Column number, class name or object.
      * @param array|null $ctorArgs Constructor arguments.
-     * @return Statement
+     * @return PDOStatement
      */
     public function query($statement,
                           $fetchMode = null,
