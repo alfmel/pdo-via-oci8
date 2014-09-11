@@ -5,9 +5,10 @@
  * @category Database
  * @package yajra/PDO-via-OCI8
  * @author Mathieu Dumoulin <crazyone@crazycoders.net>
- * @copyright Copyright (c) 2013 Mathieu Dumoulin (http://crazycoders.net/)
+ * @copyright Copyright (c) 2013 Mathieu Dumoulin (http:// crazycoders.net/)
  * @license MIT
  */
+
 namespace alfmel\OCI8;
 
 /**
@@ -52,35 +53,108 @@ class PDO
     /**
      * Creates a PDO instance representing a connection to a database
      *
-     * @param $dsn
-     * @param $username [optional]
-     * @param $password [optional]
+     * @param string $dsn
+     * @param string $username [optional]
+     * @param string $password [optional]
      * @param array $options [optional]
      * @throws \PDOException
      */
-    public function __construct($dsn, $username, $password, array $options = array())
+    public function __construct($dsn,
+                                $username = null,
+                                $password = null,
+                                array $options = array())
     {
-        // Get the character set
-        $charset = null;
-        if (array_key_exists("charset", $options))
-        {
-            $charset = $options["charset"];
-        }
+        // Parse the DSN
+        $parsedDsn = self::parseDsn($dsn, array('charset'));
 
-        //Attempt a connection
-        if (isset($options[\PDO::ATTR_PERSISTENT]) && $options[\PDO::ATTR_PERSISTENT]) {
-            $this->_dbh = @oci_pconnect($username, $password, $dsn, $charset);
+        // Get SID name
+        $sidString = (isset($parsedDsn['params']['sid'])) ?
+            '(SID = '.$parsedDsn['params']['sid']. ')' : '';
+
+        if( strpos($parsedDsn['hostname'],",") !== FALSE ) {
+
+            $hostname = explode(',',$parsedDsn['hostname']);
+            $count    = count($hostname);
+            $address  = "";
+
+            for($i = 0;$i < $count; $i++) {
+               $address .= '(ADDRESS = (PROTOCOL = TCP)(HOST = '.$hostname[$i].
+                   ')(PORT = '.$parsedDsn['port'].'))';
+            }
+
+             // Create a description to locate the database to connect to
+            $description = '(DESCRIPTION =
+                '.$address.'
+                (LOAD_BALANCE = yes)
+                (FAILOVER = on)
+                (CONNECT_DATA =
+                        '.$sidString.'
+                        (SERVER = DEDICATED)
+                        (SERVICE_NAME = '.$parsedDsn['dbname'].')
+                )
+            )';
+
+        } else if ($parsedDsn["hostname"] || $parsedDsn["dbname"]) {
+            // Create a basic connection string
+            if ($parsedDsn["hostname"])
+            {
+                $description = $parsedDsn["hostname"] . ":" .
+                    $parsedDsn["port"] . "/" . $parsedDsn["dbname"];
+            }
+            else
+            {
+                $description = $parsedDsn["dbname"];
+            }
         } else {
-            $this->_dbh = @oci_connect($username, $password, $dsn, $charset);
+
+             // Create a description to locate the database to connect to
+             $description = '(DESCRIPTION =
+                    (ADDRESS_LIST =
+                        (ADDRESS = (PROTOCOL = TCP)(HOST = '.
+                            $parsedDsn['hostname'].')
+                        (PORT = '.$parsedDsn['port'].'))
+                    )
+                    (CONNECT_DATA =
+                            '.$sidString.'
+                            (SERVICE_NAME = '.$parsedDsn['dbname'].')
+                    )
+                )';
+
         }
 
-        //Check if connection was successful
+        // see if we have character set
+        $charset = null;
+        if (array_key_exists("charset", $parsedDsn["params"]))
+        {
+            $charset = $parsedDsn["params"]["charset"];
+        }
+
+        // Attempt a connection
+        if (isset($options[\PDO::ATTR_PERSISTENT])
+            && $options[\PDO::ATTR_PERSISTENT]) {
+
+            $this->_dbh = @oci_pconnect(
+                $username,
+                $password,
+                $description,
+                $charset);
+
+        } else {
+
+            $this->_dbh = @oci_connect(
+                $username,
+                $password,
+                $description,
+                $charset);
+        }
+
+        // Check if connection was successful
         if (!$this->_dbh) {
             $e = oci_error();
             throw new \PDOException($e['message']);
         }
 
-        //Save the options
+        // Save the options
         $this->_options = $options;
     }
 
@@ -100,7 +174,7 @@ class PDO
 
         // Get instance options
         if($options == null) $options = $this->_options;
-        //Replace ? with a pseudo named parameter
+        // Replace ? with a pseudo named parameter
         $newStatement = null;
         $parameter = 0;
         while($newStatement !== $statement)
@@ -109,19 +183,21 @@ class PDO
             {
                 $statement = $newStatement;
             }
-            $newStatement = preg_replace('/\?/', ':autoparam'.$parameter, $statement, 1);
+            $newStatement = preg_replace('/\?/', ':autoparam'.$parameter,
+                $statement, 1);
             $parameter++;
         }
         $statement = $newStatement;
 
         // check if statement is insert function
         if (strpos(strtolower($statement), 'insert into')!==false) {
-            preg_match('/insert into\s+([^\s\(]*)?/', strtolower($statement), $matches);
+            preg_match('/insert into\s+([^\s\(]*)?/', strtolower($statement),
+                $matches);
             // store insert into table name
             $this->_table = $matches[1];
         }
 
-        //Prepare the statement
+        // Prepare the statement
         $sth = @oci_parse($this->_dbh, $statement);
 
         if (!$sth) {
@@ -415,8 +491,174 @@ class PDO
     }
 
     /**
-     * Special non PDO function to check if sequence exists
+     * Parses a DSN string according to the rules in the PHP manual
      *
+     * @param string $dsn
+     * @todo Extract this to a DSN Parser object and inject result into PDO class
+     * @todo Change return value of array() when invalid to thrown exception
+     * @todo Change returned value to object with default values and properties
+     * @todo Refactor to use an URI content resolver instead of
+     *   file_get_contents() that could support caching for example
+     * @param array $params
+     * @return array
+     * @link http:// www.php.net/manual/en/pdo.construct.php
+     */
+    public static function parseDsn($dsn, array $params)
+    {
+        // Create the object we will return to ensure it has the right values
+        $returnParams = array("hostname" => "", "port" => 1521, "dbname" => "",
+            "params" => array());
+
+        // If there is a colon, it means it's a parsable DSN
+        // Doesn't mean it's valid, but at least, it's parsable
+        if (strpos($dsn, ':') !== false) {
+
+            // The driver is the first part of the dsn, then comes the variables
+            $driver = null;
+            $vars = null;
+            @list($driver, $vars) = explode(':', $dsn, 2);
+
+            // Based on the driver, the processing changes
+            switch($driver)
+            {
+                case 'uri':
+
+                    // If the driver is a URI, we get the file content at that
+                    // URI and parse it
+                    return self::parseDsn(file_get_contents($vars), $params);
+
+                case 'oci':
+                    // See if we have leading //
+                    if(substr($vars, 0, 2) !== '//')
+                    {
+                        // See if we have key/value pairs
+                        if (strpos($vars, "=") === false)
+                        {
+                            // Consider the value to be a simple dbname
+                            $returnParams["dbname"] = $vars;
+                        }
+                        else
+                        {
+                            // Get the values from the key/value pairs
+                            $params = array();
+                            $raw_params = explode(";", $vars);
+
+                            foreach($raw_params as $param)
+                            {
+                                list($key, $value) =
+                                    array_pad(explode("=", $param, 2), 2, null);
+
+                                if ($key)
+                                {
+                                    $params[strtolower($key)] = $value;
+                                }
+                            }
+
+                            // Extract the dbname, hostname and port
+                            if (array_key_exists("dbname", $params))
+                            {
+                                $returnParams["dbname"] = $params["dbname"];
+                                unset($params["dbname"]);
+                            }
+                            if (array_key_exists("hostname", $params))
+                            {
+                                $returnParams["hostname"] = $params["hostname"];
+                                unset($params["hostname"]);
+                            }
+                            if (array_key_exists("port", $params))
+                            {
+                                $returnParams["port"] = $params["port"];
+                                unset($params["port"]);
+                            }
+
+                            // The rest are simply other parameters
+                            $returnParams["params"] = $params;
+                        }
+                    }
+                    else
+                    {
+                        $vars = substr($vars, 2);
+
+                        // If there is a / in the initial vars, it means we have
+                        // hostname:port configuration to read
+                        $returnParams["hostname"] = 'localhost';
+                        $returnParams["port"] = 1521;
+                        if(strpos($vars, '/') !== false)
+                        {
+
+                            // Extract the hostname port from the $vars
+                            $hostnamePost = null;
+                            @list($hostnamePort, $vars) =
+                                explode('/', $vars, 2);
+
+                            // Parse the hostname port into two variables, set
+                            // the default port if invalid
+                            @list($hostname, $port) =
+                                explode(':', $hostnamePort, 2);
+                            $returnParams["hostname"] = $hostname;
+                            if(is_numeric($port)) {
+                                $returnParams["port"] = (int)$port;
+                            }
+
+                        }
+
+                        // Extract the dbname/service name from the first part,
+                        // the rest are parameters
+                        @list($dbname, $vars) = explode(';', $vars, 2);
+                        foreach(explode(';', $vars) as $var)
+                        {
+
+                            // Get the key/value pair
+                            @list($key, $value) = explode('=', $var, 2);
+
+                            // If the key is not a valid parameter, discard
+                            if(!in_array($key, $params))
+                            {
+                                continue;
+                            }
+
+                            // Key that key/value pair
+                            $returnParams["params"][$key] = $value;
+
+                        }
+
+                        // Dbname may also contain SID
+                        if(strpos($dbname,'/SID/') !== false)
+                        {
+                            list($dbname, $sidKey, $sidValue) =
+                                explode('/',$dbname);
+                        }
+
+                        // Condense the parameters, hostname, port, dbname into
+                        // $returnParams
+                        $returnParams['dbname'] = $dbname;
+                        if(isset($sidValue)) $returnParams["params"]['sid'] =
+                            $sidValue;
+                    }
+
+                    // Return the resulting configuration
+                    return $returnParams;
+                default:
+                    throw new \PDOException($driver . " is not supported by " .
+                        "this implementation");
+
+            }
+
+        // If there is no colon, it means it's a DSN name in php.ini
+        } elseif (strlen(trim($dsn)) > 0) {
+
+            // The DSN passed in must be an alias set in php.ini
+            return self::parseDsn(ini_get("pdo.dsn.".$dsn), $params);
+
+        }
+
+        // Not valid, return default values
+        return $returnParams;
+
+    }
+
+    /**
+     * Special non PDO function to check if sequence exists
      * @param  string $name
      * @return boolean
      */
@@ -433,5 +675,4 @@ class PDO
             ");
         return $stmt->fetch();
     }
-
 }
