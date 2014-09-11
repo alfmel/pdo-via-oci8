@@ -1,8 +1,5 @@
 # PDO Userspace Driver for Oracle (oci8)
 
-*******************
-###IMPORTANT: Package was merged on [yajra/laravel-oci8](https://github.com/yajra/laravel-oci8). This project will be maintained on said package.
-*******************
 ###PDO via Oci8
 
 The [alfmel/pdo-via-oci8](https://github.com/alfmel/pdo-via-oci8) package is a simple userspace driver for PDO that uses the tried and tested
