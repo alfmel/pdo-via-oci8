@@ -130,28 +130,36 @@ class PDO
         }
 
         // Attempt a connection
-        if (isset($options[\PDO::ATTR_PERSISTENT])
-            && $options[\PDO::ATTR_PERSISTENT]) {
+        // The @ won't ignore the error in strict mode, so catch ErrorException
+        try {
+            if (isset($options[\PDO::ATTR_PERSISTENT])
+                && $options[\PDO::ATTR_PERSISTENT]) {
 
-            $this->_dbh = @oci_pconnect(
-                $username,
-                $password,
-                $description,
-                $charset);
+                $this->_dbh = @oci_pconnect(
+                    $username,
+                    $password,
+                    $description,
+                    $charset);
 
-        } else {
+            } else {
 
-            $this->_dbh = @oci_connect(
-                $username,
-                $password,
-                $description,
-                $charset);
+                $this->_dbh = @oci_connect(
+                    $username,
+                    $password,
+                    $description,
+                    $charset);
+            }
+        }
+        catch (\ErrorException $e) {
+            $this->_dbh = false;
         }
 
         // Check if connection was successful
         if (!$this->_dbh) {
-            $e = oci_error();
-            throw new \PDOException($e['message']);
+            $e = $this->errorInfo();
+            $pdo_exception = new \PDOException($e[2], $e[1]);
+            $pdo_exception->errorInfo = $e;
+            throw $pdo_exception;
         }
 
         // Save the options
@@ -198,11 +206,18 @@ class PDO
         }
 
         // Prepare the statement
-        $sth = @oci_parse($this->_dbh, $statement);
+        try {
+            $sth = @oci_parse($this->_dbh, $statement);
+        }
+        catch (\ErrorException $e) {
+            $sth = false;
+        }
 
         if (!$sth) {
-            $e = oci_error($this->_dbh);
-            throw new \PDOException($e['message']);
+            $e = $this->errorInfo();
+            $pdo_exception = new \PDOException($e[2], $e[1]);
+            $pdo_exception->errorInfo = $e;
+            throw $pdo_exception;
         }
 
         if (!is_array($options)) {
@@ -399,7 +414,13 @@ class PDO
      */
     public function errorInfo()
     {
-        $e = oci_error($this->_dbh);
+        if ($this->_dbh) {
+            $e = oci_error($this->_dbh);
+        }
+        else {
+            $e = oci_error();
+        }
+
 
         if (is_array($e)) {
             return array(

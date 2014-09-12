@@ -144,18 +144,19 @@ class PDOStatement
             }
         }
 
-        $result = @oci_execute($this->_sth, $mode);
+        // The @ won't ignore the error in strict mode, so catch ErrorException
+        try {
+            $result = @oci_execute($this->_sth, $mode);
+        }
+        catch (\ErrorException $e) {
+            $result = false;
+        }
         if($result != true)
         {
-            $e = oci_error($this->_sth);
-            
-            $message = '';
-            $message = $message . 'Error Code    : ' . $e['code'] . PHP_EOL;
-            $message = $message . 'Error Message : ' . $e['message'] . PHP_EOL;
-            $message = $message . 'Position      : ' . $e['offset'] . PHP_EOL;
-            $message = $message . 'Statement     : ' . $e['sqltext'];
-            
-            throw new \PDOException($message, $e['code']);
+            $e = $this->errorInfo();
+            $pdo_exception = new \PDOException($e[2], $e[1]);
+            $pdo_exception->errorInfo = $e;
+            throw $pdo_exception;
         }
         return $result;
     }
@@ -376,7 +377,8 @@ class PDOStatement
         }
 
         //Bind the parameter
-        $result = oci_bind_by_name($this->_sth, $parameter, $variable, $maxLength, $oci_type);
+        $result = oci_bind_by_name($this->_sth, $parameter, $variable,
+            $maxLength, $oci_type);
         return $result;
 
     }
