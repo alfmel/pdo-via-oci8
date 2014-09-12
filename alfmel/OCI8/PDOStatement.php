@@ -50,11 +50,11 @@ class PDOStatement
     protected $_key;
 
     /**
-     * flag to convert BLOB to string or not
+     * flag to convert LOB to string or not
      *
      * @var boolean
      */
-    protected $returnLobs = true;
+    protected $_returnLobs = true;
 
     /**
      * Statement options
@@ -92,7 +92,7 @@ class PDOStatement
     protected $_fetchCtorargs = array();
 
     /**
-     * Object reference for PDO::FETCH_into fetch mode
+     * Object reference for PDO::FETCH_INTO fetch mode
      *
      * @var object
      */
@@ -192,6 +192,10 @@ class PDOStatement
 
         // Convert array keys (or object properties) to lowercase
         $toLowercase = ($this->getAttribute(\PDO::ATTR_CASE) == \PDO::CASE_LOWER);
+        // Convert null value to empty string
+        $nullToString = ($this->getAttribute(\PDO::ATTR_ORACLE_NULLS) == \PDO::NULL_TO_STRING);
+        // Convert empty string to null
+        $nullEmptyString = ($this->getAttribute(\PDO::ATTR_ORACLE_NULLS) == \PDO::NULL_EMPTY_STRING);
 
         // Determine the fetch mode
         switch($fetchMode)
@@ -202,7 +206,7 @@ class PDOStatement
                     return false;
                 }
                 if($toLowercase) $rs = array_change_key_case($rs);
-                if ($this->returnLobs && is_array($rs)) {
+                if ($this->_returnLobs && is_array($rs)) {
                     foreach ($rs as $field => $value) {
                         if (is_object($value) ) {
                             $rs[$field] = $value->load();
@@ -218,7 +222,7 @@ class PDOStatement
                     return false;
                 }
                 if($toLowercase) $rs = array_change_key_case($rs);
-                if ($this->returnLobs && is_array($rs)) {
+                if ($this->_returnLobs && is_array($rs)) {
                     foreach ($rs as $field => $value) {
                         if (is_object($value) ) {
                             $rs[$field] = $value->load();
@@ -233,7 +237,7 @@ class PDOStatement
                 if($rs === false) {
                     return false;
                 }
-                if ($this->returnLobs && is_array($rs)) {
+                if ($this->_returnLobs && is_array($rs)) {
                     foreach ($rs as $field => $value) {
                         if (is_object($value) ) {
                             $rs[$field] = $value->load();
@@ -291,9 +295,21 @@ class PDOStatement
                     }
                 }
 
+                // Format recordsets values depending on options
                 foreach($rs as $field => $value)
                 {
-                    if ($this->returnLobs && is_object($value)) {
+                    // convert null to empty string
+                    if (is_null($value) && $nullToString) {
+                        $rs[$field] = '';
+                    }
+
+                    // convert empty string to null
+                    if (empty($rs[$field]) && $nullEmptyString) {
+                        $rs[$field] = null;
+                    }
+
+                    // convert LOB to string
+                    if ($this->_returnLobs && is_object($value)) {
                         $object->$field = $value->load();
                     } else {
                         $object->$field = $value;
@@ -605,6 +621,7 @@ class PDOStatement
         $meta['len'] = oci_field_size($this->_sth, $column);
         $meta['precision'] = oci_field_precision($this->_sth, $column);
         $meta['pdo_type'] = null;
+        $meta['is_null'] = oci_field_is_null($this->_sth, $column);
 
         return $meta;
     }
@@ -683,7 +700,7 @@ class PDOStatement
      */
     public function nextRowset()
     {
-        throw new \Exception("seteFetchMode has not been implemented");
+        throw new \Exception("setFetchMode has not been implemented");
     }
 
     /**
@@ -695,7 +712,7 @@ class PDOStatement
      */
     public function closeCursor()
     {
-        throw new \Exception("seteFetchMode has not been implemented");
+        throw new \Exception("setFetchMode has not been implemented");
     }
 
     /**
@@ -707,7 +724,7 @@ class PDOStatement
      */
     public function debugDumpParams()
     {
-        throw new \Exception("seteFetchMode has not been implemented");
+        throw new \Exception("setFetchMode has not been implemented");
     }
 
 }
