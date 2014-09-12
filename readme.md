@@ -6,9 +6,9 @@ The [alfmel/pdo-via-oci8](https://github.com/alfmel/pdo-via-oci8) package is a s
 [OCI8](http://php.net/oci8) functions instead of using the still experimental and not all that functional
 [PDO_OCI](http://www.php.net/manual/en/ref.pdo-oci.php) library.
 
-This fork from [yajra/laravel-pdo-via-oci8](https://github.com/yajra/laravel-pdo-via-oci8) restores full DSN support (removed to fit better
-within Laravel) making the project fully portable to any installation. This fork also includes improved class names and error handling for
-strict error reporting configurations.
+This fork from [yajra/laravel-pdo-via-oci8](https://github.com/yajra/laravel-pdo-via-oci8) restores full DSN support (previously removed to
+fit better within Laravel) making the project fully portable to any installation. This fork also includes improved class names and error
+handling for strict error reporting configurations.
 
 **Please report any bugs you may find.**
 
