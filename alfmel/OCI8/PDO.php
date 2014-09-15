@@ -442,7 +442,7 @@ class PDO
      */
     public function getAttribute($attribute)
     {
-        if ($attribute = \PDO::ATTR_DRIVER_NAME) {
+        if ($attribute == \PDO::ATTR_DRIVER_NAME) {
             return "oci";
         }
 
