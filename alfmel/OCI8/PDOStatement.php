@@ -8,6 +8,7 @@
  * @copyright Copyright (c) 2013 Mathieu Dumoulin (http://crazycoders.net/)
  * @license MIT
  */
+
 namespace alfmel\OCI8;
 
 /**
@@ -249,8 +250,9 @@ class PDOStatement
 
             case \PDO::FETCH_COLUMN:
                 $rs = oci_fetch_row($this->_sth);
-                if (array_key_exists($this->_fetchColno, $rs)) {
-                    $value = $rs[$this->_fetchColno];
+                $colno = (int) $this->_fetchColno;
+                if (is_array($rs) && array_key_exists($colno, $rs)) {
+                    $value = $rs[$colno];
                     if (is_object($value)) {
                         return $value->load();
                     } else {
